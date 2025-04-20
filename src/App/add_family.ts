@@ -104,105 +104,107 @@ const express = require('express');
 const AddFamily = express.Router();
 
 AddFamily.post("/add-member", async (req, res) => {
-    const isVerified = verifyToken(req);
-    console.log(req.body, "req.body add");
+  const isVerified = verifyToken(req);
+  console.log(req.body, "req.body add");
 
-    if (isVerified === true) {
-        const { id, members } = req.body;
-        let userIds = [];
+  if (!isVerified) {
+    return res.json({
+      status: 401,
+      message: "Unauthenticated",
+      data: null,
+    });
+  }
 
-        const existingMembers = [];
+  const { id, members } = req.body;
+  const existingMembers = [];
 
-        // First, check if any members already exist
-        Promise.all(
-            members.map((member) => {
-                return new Promise((resolve, reject) => {
-                    const { email, phone } = member;
-
-                    connection.query("SELECT * FROM family_members WHERE email = ? OR phone = ?", [email, phone], (err, result) => {
-                        if (err) {
-                            reject(err);
-                        } else if (result.length > 0) {
-                            existingMembers.push({
-                                email,
-                                phone
-                            });
-                            resolve(null);
-                        } else {
-                            resolve(member);
-                        }
-                    });
-                });
-            })
-        ).then((results) => {
-            // If any members already exist, return an error response
-            if (existingMembers.length > 0) {
-                return res.json({
-                    status: 400,
-                    message: 'Some family members already exist',
-                    data: existingMembers
-                });
+  try {
+    // Check if any members already exist
+    const validMembers = await Promise.all(
+      members.map((member) => {
+        return new Promise((resolve, reject) => {
+          const { email, phone } = member;
+          connection.query(
+            "SELECT * FROM family_members WHERE email = ? OR phone = ?",
+            [email, phone],
+            (err, result) => {
+              if (err) return reject(err);
+              if (result.length > 0) {
+                existingMembers.push({ email, phone });
+                resolve(null);
+              } else {
+                resolve(member);
+              }
             }
-
-            // Otherwise, insert new members
-            return Promise.all(
-                results.filter(Boolean).map((member) => {
-                    return new Promise((resolve, reject) => {
-                        connection.query('INSERT INTO family_members SET ?', member, (err, insertRes) => {
-                            if (err) {
-                                reject(err);
-                            } else {
-                                console.log("New member added", insertRes);
-
-                                connection.query("SELECT * FROM family_members WHERE email = ?", [member.email], (err, newRes) => {
-                                    if (err) {
-                                        reject(err);
-                                    }
-
-                                    if (newRes.length > 0) {
-                                        userIds.push(newRes[0].id);
-                                        connection.query("UPDATE users SET members = ? WHERE id = ?", [JSON.stringify(userIds), id], (err, updateRes) => {
-                                            if (err) {
-                                                reject(err);
-                                            }
-                                            resolve(updateRes);
-                                        });
-                                    }
-                                });
-                            }
-                        });
-                    });
-                })
-            );
-        }).then((resolve) => {
-            res.json({
-                status: 200,
-                message: 'Members added successfully',
-                data: resolve
-            });
-        }).catch((err) => {
-console.log(err,"req.body add");
-            res.json({
-                status: 500,
-                message: 'Something went wrong',
-                data: err
-            });
+          );
         });
-    } else {
-        res.json({
-            status: 401,
-            message: "Unauthenticated",
-            data: null
-        });
+      })
+    );
+
+    if (existingMembers.length > 0) {
+      return res.json({
+        status: 400,
+        message: "Some family members already exist",
+        data: existingMembers,
+      });
     }
+
+    // Insert valid members
+    await Promise.all(
+      validMembers.filter(Boolean).map((member) => {
+        return new Promise((resolve, reject) => {
+          const memberWithUserId = { ...member, user_id: id }; // Make sure `user_id` is set
+
+          connection.query(
+            "INSERT INTO family_members SET ?",
+            memberWithUserId,
+            (err, insertRes) => {
+              if (err) return reject(err);
+              console.log("New member added", insertRes);
+              resolve(insertRes);
+            }
+          );
+        });
+      })
+    );
+
+    // Fetch all family members for the user
+    connection.query(
+      "SELECT * FROM family_members WHERE user_id = ?",
+      [id],
+      (err, allMembers) => {
+        if (err) {
+          return res.json({
+            status: 500,
+            message: "Error fetching family members",
+            data: err,
+          });
+        }
+
+        res.json({
+          status: 200,
+          message: "Members added successfully",
+          data: allMembers,
+        });
+      }
+    );
+  } catch (err) {
+    console.log(err, "req.body add");
+    res.json({
+      status: 500,
+      message: "Something went wrong",
+      data: err,
+    });
+  }
 });
+
 
 AddFamily.post("/update-family",(req,res)=>{
     try {
-        let { id, full_name, email, gender, occupation, age, image, gotra, address,married } = req.body;
-
-        const updateQuery = 'UPDATE family_members SET full_name = ?,email = ?,gender = ?,occupation = ?,age = ?,image = ?,gotra = ?,address = ?,isProfileCompleted = ?,married = ? WHERE id = ?'
-        connection.query(updateQuery, [full_name, email, gender, occupation, age, image, gotra, address,1,married, id], async (err, result) => {
+        let { id, full_name, email, gender, occupation, age, image, gotra, address,married,phone } = req.body;
+        const updateQuery =
+          "UPDATE family_members SET full_name = ?,email = ?,phone = ?,gender = ?,occupation = ?,age = ?,image = ?,gotra = ?,address = ?,isProfileCompleted = ?,married = ? WHERE id = ?";
+        connection.query(updateQuery, [full_name, email,phone, gender, occupation, age, image, gotra, address,1,married, id], async (err, result) => {
             if (err) {
                 res.json({
                     status: 500,

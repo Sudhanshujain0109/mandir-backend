@@ -9,6 +9,7 @@ AppProfile.get("/app/get-profile", (req, res) => {
     if (isVerified === true) {
         console.log(req.query.id, "req.query.id");
         DBConfig_1.connection.query('Select * FROM users WHERE id = ?', [req.query.id], (err, result) => {
+            console.log;
             if (err) {
                 res.json({
                     status: 500,
