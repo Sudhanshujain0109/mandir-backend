@@ -59,5 +59,49 @@ SearchRouter.get("/search", (req, res) => __awaiter(void 0, void 0, void 0, func
         });
     });
 }));
+SearchRouter.get("/search-by-occupation", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const isVerified = (0, HelperFunction_1.verifyToken)(req);
+    if (isVerified !== true) {
+        return res.json({
+            status: 401,
+            message: "Unauthenticated",
+            data: null,
+        });
+    }
+    const { query } = req.query;
+    if (!query) {
+        return res.json({
+            status: 400,
+            message: "Query parameter is required",
+            data: null,
+        });
+    }
+    const occupationQuery = `%${query}%`;
+    const sql = `
+        SELECT 'users' AS type, id, full_name, phone, email, address, gotra, occupation, age, married, gender, postal_address, image
+        FROM users
+        WHERE occupation LIKE ?
+
+        UNION ALL
+
+        SELECT 'family_members' AS type, id, full_name, phone, email, address, gotra, occupation, age, married, gender, postal_address, image
+        FROM family_members
+        WHERE occupation LIKE ?
+    `;
+    DBConfig_1.connection.query(sql, [occupationQuery, occupationQuery], (err, results) => {
+        if (err) {
+            return res.json({
+                status: 500,
+                message: "Something went wrong",
+                data: err,
+            });
+        }
+        return res.json({
+            status: 200,
+            message: "Search results by occupation",
+            data: results,
+        });
+    });
+}));
 exports.default = SearchRouter;
 //# sourceMappingURL=search_user.js.map

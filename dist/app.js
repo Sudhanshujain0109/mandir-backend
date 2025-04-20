@@ -57,9 +57,10 @@ const path_1 = __importDefault(require("path"));
 const search_user_1 = __importDefault(require("./App/search_user"));
 const occupation_1 = __importDefault(require("./AdminApi/occupation"));
 const jeenvaani_1 = __importDefault(require("./AdminApi/jeenvaani"));
+const uploadImage_1 = __importDefault(require("./App/uploadImage"));
 // const cors = require('cors');
 // const path = require('path');
-const port = process.env.PORT || 8000;
+const port = process.env.PORT || 8001;
 console.log(port, "check");
 var allowedOrigins = ['http://localhost:3000',
     'http://139.144.1.59:9999', "http://139.144.1.59"];
@@ -76,13 +77,31 @@ app.use((0, cors_1.default)());
 app.use(express_1.default.urlencoded({ extended: true }));
 app.listen(port, () => __awaiter(void 0, void 0, void 0, function* () {
     yield (0, DBConfig_1.default)();
-    const sql = 'ALTER TABLE family_members ADD COLUMN anni TEXT';
-    DBConfig_1.connection.query(sql, (err, result) => {
+    const checkColumnExistsQuery = `
+    SELECT COUNT(*) as count
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = 'jaiDB'
+    AND TABLE_NAME = 'family_members'
+    AND COLUMN_NAME = 'anni'
+  `;
+    DBConfig_1.connection.query(checkColumnExistsQuery, (err, result) => {
         if (err) {
-            console.error('Error adding column:', err);
+            console.error("Error checking column:", err);
+            return;
+        }
+        if (result[0].count === 0) {
+            const addColumnQuery = "ALTER TABLE family_members ADD COLUMN anni TEXT";
+            DBConfig_1.connection.query(addColumnQuery, (err, result) => {
+                if (err) {
+                    console.error("Error adding column:", err);
+                }
+                else {
+                    console.log("Column `anni` added successfully.");
+                }
+            });
         }
         else {
-            console.log('Column added successfully:', result);
+            console.log("Column `anni` already exists. Skipping ALTER TABLE.");
         }
     });
 }));
@@ -113,4 +132,5 @@ app.use(search_user_1.default);
 app.use(AppContent_1.default);
 app.use(occupation_1.default);
 app.use(jeenvaani_1.default);
+app.use(uploadImage_1.default);
 //# sourceMappingURL=app.js.map

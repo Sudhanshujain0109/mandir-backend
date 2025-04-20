@@ -22,6 +22,7 @@ import path from 'path'
 import SearchRouter from './App/search_user';
 import Occupation from './AdminApi/occupation';
 import Jeenvani from './AdminApi/jeenvaani';
+import UploadImage from './App/uploadImage'
 // const cors = require('cors');
 // const path = require('path');
 const port = process.env.PORT || 8001;
@@ -121,5 +122,7 @@ app.use(AppContentRouter)
 
 app.use(Occupation)
 app.use(Jeenvani)
+
+app.use(UploadImage);
 
 
